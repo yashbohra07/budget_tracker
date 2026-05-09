@@ -1,0 +1,11 @@
+.env
+.streamlit/secrets.toml
+budget_venv/
+__pycache__/
+*.pyc
+.DS_Store
+linux_deb
+db_interaction.ipynb
+idea.md
+product_details.md
+implementation_plan.md
