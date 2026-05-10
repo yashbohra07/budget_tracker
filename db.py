@@ -5,7 +5,7 @@ from config import _get
 
 @st.cache_resource
 def get_client():
-    return MongoClient(_get("MONGO_URI_LOCAL"))
+    return MongoClient(_get("MONGO_URI"))
 
 
 def get_db():
