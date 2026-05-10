@@ -1,7 +1,7 @@
 import streamlit as st
 from datetime import datetime
 from services.balance import compute_balance, get_neutral_spends_since_settlement
-from services.budget_service import get_budget_status
+from services.budget_service import get_budget_status, get_budget_totals
 from models.transaction import get_transactions_for_month, get_monthly_total
 from models.settlement import add_settlement
 from models.category import get_subcategory, get_all_categories
@@ -43,14 +43,31 @@ st.session_state.selected_month = selected
 month = selected
 
 # ── Spend summary ─────────────────────────────────────────────────────────────
-total       = get_monthly_total(month)
-yash_total  = get_monthly_total(month, paid_by="Yash")
-daksha_total= get_monthly_total(month, paid_by="Daksha")
+total        = get_monthly_total(month)
+yash_total   = get_monthly_total(month, paid_by="Yash")
+daksha_total = get_monthly_total(month, paid_by="Daksha")
+
+budget_totals  = get_budget_totals(month)
+total_budget   = budget_totals["total"]
+yash_budget    = budget_totals["by_person"].get("Yash", 0)
+daksha_budget  = budget_totals["by_person"].get("Daksha", 0)
 
 metric_cards([
-    {"label": "Total Spent",  "value": f"₹{total:,.0f}",        "color": C["total"],  "icon": "💸"},
-    {"label": "Yash",         "value": f"₹{yash_total:,.0f}",   "color": C["yash"],   "icon": "👤"},
-    {"label": "Daksha",       "value": f"₹{daksha_total:,.0f}", "color": C["daksha"], "icon": "👤"},
+    {
+        "label": "Total Spent", "value": f"₹{total:,.0f}",
+        "sub": f"of ₹{total_budget:,.0f} budget" if total_budget else None,
+        "color": C["total"], "icon": "💸",
+    },
+    {
+        "label": "Yash", "value": f"₹{yash_total:,.0f}",
+        "sub": f"of ₹{yash_budget:,.0f}" if yash_budget else None,
+        "color": C["yash"], "icon": "👤",
+    },
+    {
+        "label": "Daksha", "value": f"₹{daksha_total:,.0f}",
+        "sub": f"of ₹{daksha_budget:,.0f}" if daksha_budget else None,
+        "color": C["daksha"], "icon": "👤",
+    },
 ])
 
 st.html("<div style='height:0.5rem'></div>")
@@ -92,11 +109,40 @@ budget_rows = get_budget_status(month)
 if not budget_rows:
     st.caption("No budgets set for this month. Set them in the Budgets page.")
 else:
+    from collections import defaultdict
+    by_cat = defaultdict(lambda: {"cat_row": None, "sub_rows": [], "cat_name": ""})
     for row in budget_rows:
-        label = row["category_name"]
-        if row["subcategory_name"]:
-            label += f" › {row['subcategory_name']}"
-        budget_bar(label, row["spent"], row["budget_amount"], row["pct_used"], row["status"])
+        cid = row["category_id"]
+        by_cat[cid]["cat_name"] = row["category_name"]
+        if row["subcategory_id"] is None:
+            by_cat[cid]["cat_row"] = row
+        else:
+            by_cat[cid]["sub_rows"].append(row)
+
+    STATUS_ICON = {"ok": "🟢", "warn": "🟡", "over": "🔴"}
+
+    for cid, data in by_cat.items():
+        cat_row  = data["cat_row"]
+        sub_rows = data["sub_rows"]
+        cat_name = data["cat_name"]
+
+        if cat_row:
+            spent, budget, pct, status = cat_row["spent"], cat_row["budget_amount"], cat_row["pct_used"], cat_row["status"]
+        elif sub_rows:
+            spent  = sum(r["spent"] for r in sub_rows)
+            budget = sum(r["budget_amount"] for r in sub_rows)
+            pct    = round((spent / budget * 100) if budget > 0 else 0, 1)
+            status = "over" if pct >= 100 else "warn" if pct >= 80 else "ok"
+        else:
+            continue
+
+        if sub_rows:
+            label = f"{STATUS_ICON[status]}  {cat_name}   ₹{spent:,.0f} / ₹{budget:,.0f}"
+            with st.expander(label):
+                for sub in sub_rows:
+                    budget_bar(sub["subcategory_name"], sub["spent"], sub["budget_amount"], sub["pct_used"], sub["status"])
+        else:
+            budget_bar(cat_name, spent, budget, pct, status)
 
 # ── Recent transactions ───────────────────────────────────────────────────────
 section_title("Recent Transactions")

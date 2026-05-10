@@ -4,6 +4,45 @@ from models.transaction import get_transactions_for_month
 from models.category import get_all_categories, get_subcategories
 
 
+def get_budget_totals(month: str) -> dict:
+    """
+    Returns total budget for the month and per-person budgets derived from
+    subcategory assignees.
+    {
+        "total": float,
+        "by_person": {"Yash": float, "Daksha": float, ...}
+    }
+    For each category, uses the category-level budget if set; otherwise sums
+    its subcategory budgets (avoids double-counting).
+    """
+    budgets = get_budgets(month)
+    if not budgets:
+        return {"total": 0.0, "by_person": {}}
+
+    all_subcats = {s["_id"]: s for s in get_subcategories()}
+
+    cat_level = {}          # cat_id -> amount
+    sub_level = defaultdict(float)   # cat_id -> sum of subcat budgets
+    person_budgets = defaultdict(float)
+
+    for b in budgets:
+        cat_id = b["category_id"]
+        sub_id = b.get("subcategory_id")
+        if sub_id is None:
+            cat_level[cat_id] = b["amount"]
+        else:
+            sub_level[cat_id] += b["amount"]
+            assignee = all_subcats.get(sub_id, {}).get("assignee")
+            if assignee:
+                person_budgets[assignee] += b["amount"]
+
+    total = 0.0
+    for cat_id in set(cat_level) | set(sub_level):
+        total += cat_level[cat_id] if cat_id in cat_level else sub_level[cat_id]
+
+    return {"total": round(total, 2), "by_person": dict(person_budgets)}
+
+
 def get_budget_status(month: str) -> list:
     """
     Returns a list of budget status rows for all budgets set in the given month.
