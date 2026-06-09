@@ -59,6 +59,36 @@ def compute_balance() -> dict:
         return {"owes": "Daksha", "owed_to": "Yash", "amount": abs(balance), "settled": False}
 
 
+def get_balance_transactions() -> list:
+    """
+    Returns transactions that make up the current balance — assigned subcategories
+    where paid_by != assignee, since last settlement. Each item includes
+    _subcat_name, _assignee, and _cat_name for display.
+    """
+    from models.category import get_all_categories
+    last_settled = get_last_settlement_date()
+    filters = {}
+    if last_settled:
+        filters["date_from"] = last_settled.date() if hasattr(last_settled, "date") else last_settled
+
+    txns = get_transactions(**filters)
+    cats = {c["_id"]: c["name"] for c in get_all_categories()}
+    result = []
+    for txn in txns:
+        subcat = get_subcategory(txn["subcategory_id"])
+        if not subcat or not subcat.get("assignee"):
+            continue
+        if subcat["assignee"] == txn["paid_by"]:
+            continue
+        result.append({
+            **txn,
+            "_subcat_name": subcat["name"],
+            "_assignee": subcat["assignee"],
+            "_cat_name": cats.get(txn["category_id"], "—"),
+        })
+    return result
+
+
 def get_neutral_spends_since_settlement() -> list:
     """
     Returns transactions on neutral subcategories since last settlement.

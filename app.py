@@ -1,5 +1,6 @@
 import streamlit as st
 from seed import run as seed_run
+from services.recurring import auto_fill_recurring
 
 st.set_page_config(page_title="Budget Tracker", page_icon="💰", layout="centered")
 
@@ -9,6 +10,10 @@ apply_global_styles()
 if "seeded" not in st.session_state:
     seed_run()
     st.session_state.seeded = True
+
+if "recurring_filled" not in st.session_state:
+    auto_fill_recurring()
+    st.session_state.recurring_filled = True
 
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False

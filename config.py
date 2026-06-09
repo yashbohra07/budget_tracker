@@ -16,6 +16,16 @@ def _get(key: str) -> str:
 
 PERSONS = ["Yash", "Daksha"]
 
+# Recurring transactions: auto-filled on due date each month, blocked from manual entry.
+# day: int (day of month) or "last" (last day of month)
+RECURRING_TRANSACTIONS = [
+    {"category": "Household",     "subcategory": "Rent",          "day": 9},
+    {"category": "Household",     "subcategory": "House Help",     "day": "last"},
+    {"category": "Household",     "subcategory": "Car Wash",       "day": 15},
+    {"category": "Utility Bills", "subcategory": "Ahmedabad Wifi", "day": 28},
+    {"category": "Utility Bills", "subcategory": "Jodhpur Wifi",   "day": 7},
+]
+
 DEFAULT_CATEGORIES = [
     {
         "name": "Household",

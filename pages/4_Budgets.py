@@ -1,6 +1,6 @@
 import streamlit as st
 from datetime import datetime
-from models.budget import set_budget, get_budgets, delete_budget
+from models.budget import set_budget, set_budget_cascading, carry_forward_budgets, get_budgets, delete_budget
 from models.category import get_all_categories, get_subcategories
 from services.budget_service import get_budget_status
 from components.styles import apply_global_styles, C, page_header, budget_bar, section_title
@@ -14,12 +14,15 @@ apply_global_styles()
 
 now = datetime.now()
 months = []
-for i in range(11, -1, -1):
+for i in range(11, -12, -1):  # 11 past + current + 11 future
     m = now.month - i
     y = now.year
     while m <= 0:
         m += 12
         y -= 1
+    while m > 12:
+        m -= 12
+        y += 1
     months.append(f"{y}-{m:02d}")
 
 current_month = f"{now.year}-{now.month:02d}"
@@ -48,6 +51,22 @@ st.divider()
 
 # ── Set / edit budgets ────────────────────────────────────────────────────────
 section_title("Set Budgets")
+
+# Carry forward from previous month
+year, mon = map(int, month.split("-"))
+prev_mon, prev_year = (mon - 2) % 12 + 1, year - (1 if mon == 1 else 0)
+prev_month = f"{prev_year}-{prev_mon:02d}"
+prev_budgets = get_budgets(prev_month)
+
+if prev_budgets:
+    prev_label = datetime.strptime(prev_month, "%Y-%m").strftime("%B %Y")
+    cur_label  = datetime.strptime(month, "%Y-%m").strftime("%B %Y")
+    col_cf, _ = st.columns([2, 3])
+    with col_cf:
+        if st.button(f"📋 Carry forward from {prev_label}", use_container_width=True):
+            carry_forward_budgets(prev_month, month)
+            st.success(f"Budgets copied from {prev_label} to {cur_label} and onwards.")
+            st.rerun()
 categories = get_all_categories()
 existing = {
     (str(b["category_id"]), str(b["subcategory_id"]) if b.get("subcategory_id") else None): b
@@ -74,7 +93,7 @@ for cat in categories:
             st.write("")
             if st.button("Save", key=f"save_cat_{cat_id}"):
                 if new_val > 0:
-                    set_budget(month, cat_id, new_val)
+                    set_budget_cascading(month, cat_id, new_val)
                 elif existing_cat_budget:
                     delete_budget(existing_cat_budget["_id"])
                 st.rerun()
@@ -98,7 +117,7 @@ for cat in categories:
                 st.write("")
                 if st.button("Save", key=f"save_sub_{sub_id}"):
                     if new_sub_val > 0:
-                        set_budget(month, cat_id, new_sub_val, subcategory_id=sub_id)
+                        set_budget_cascading(month, cat_id, new_sub_val, subcategory_id=sub_id)
                     elif existing_sub_budget:
                         delete_budget(existing_sub_budget["_id"])
                     st.rerun()

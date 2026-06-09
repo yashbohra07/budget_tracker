@@ -14,27 +14,46 @@ apply_global_styles()
 page_header("📋", "Transactions")
 
 # ── Filters ───────────────────────────────────────────────────────────────────
+categories = get_all_categories()
+cat_map = {c["name"]: c for c in categories}
+
 with st.expander("🔍 Filters", expanded=True):
     col1, col2 = st.columns(2)
     with col1:
         filter_person = st.selectbox("Paid by", ["All"] + PERSONS)
     with col2:
-        categories = get_all_categories()
         cat_options = ["All"] + [c["name"] for c in categories]
         filter_cat_name = st.selectbox("Category", cat_options)
 
     col3, col4 = st.columns(2)
     with col3:
-        date_from = st.date_input("From", value=date(datetime.now().year, datetime.now().month, 1))
+        if filter_cat_name != "All":
+            sub_list = get_subcategories(category_id=cat_map[filter_cat_name]["_id"])
+            sub_options = ["All"] + [s["name"] for s in sub_list]
+            sub_map = {s["name"]: s for s in sub_list}
+        else:
+            sub_options = ["All"]
+            sub_map = {}
+        filter_sub_name = st.selectbox(
+            "Subcategory", sub_options,
+            disabled=(filter_cat_name == "All"),
+        )
     with col4:
+        pass  # spacer to keep date inputs on their own row
+
+    col5, col6 = st.columns(2)
+    with col5:
+        date_from = st.date_input("From", value=date(datetime.now().year, datetime.now().month, 1))
+    with col6:
         date_to = st.date_input("To", value=date.today())
 
-cat_map = {c["name"]: c for c in categories}
 filters = {"date_from": date_from, "date_to": date_to}
 if filter_person != "All":
     filters["paid_by"] = filter_person
 if filter_cat_name != "All":
     filters["category_id"] = cat_map[filter_cat_name]["_id"]
+if filter_sub_name != "All" and filter_sub_name in sub_map:
+    filters["subcategory_id"] = sub_map[filter_sub_name]["_id"]
 
 txns = get_transactions(**filters)
 
